@@ -1,0 +1,400 @@
+--[[
+    ClickDetector & TouchInterest Scanner
+    Mobile-friendly GUI with copy-to-clipboard functionality
+    Platform: Roblox (Client-side)
+--]]
+
+-- ============================================================
+-- SERVICES
+-- ============================================================
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ============================================================
+-- CONFIG
+-- ============================================================
+local CONFIG = {
+    Title = "Scanner: ClickDetector / TouchInterest",
+    Version = "1.0",
+    AccentColor = Color3.fromRGB(85, 170, 255),
+    BgColor = Color3.fromRGB(25, 25, 30),
+    PanelColor = Color3.fromRGB(35, 35, 42),
+    TextColor = Color3.fromRGB(240, 240, 240),
+    MutedText = Color3.fromRGB(160, 160, 170),
+    ButtonColor = Color3.fromRGB(60, 60, 70),
+    ButtonHover = Color3.fromRGB(80, 80, 95),
+    CopyColor = Color3.fromRGB(60, 160, 90),
+    CloseColor = Color3.fromRGB(180, 60, 60),
+    ScanColor = Color3.fromRGB(70, 120, 200),
+}
+
+-- ============================================================
+-- HELPER: Prevent duplicate GUIs
+-- ============================================================
+local guiName = "ScannerGui_ClickTouch"
+local existing = PlayerGui:FindFirstChild(guiName)
+if existing then
+    existing:Destroy()
+end
+
+-- ============================================================
+-- CREATE MAIN GUI
+-- ============================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = guiName
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+-- Detect if on mobile (bigger UI)
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local panelWidth = isMobile and 340 or 420
+local panelHeight = isMobile and 420 or 460
+local padding = 10
+
+-- Main frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, panelWidth, 0, panelHeight)
+MainFrame.Position = UDim2.new(0.5, -panelWidth/2, 0.5, -panelHeight/2)
+MainFrame.BackgroundColor3 = CONFIG.BgColor
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- native drag for touch & mouse
+MainFrame.Parent = ScreenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = MainFrame
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = CONFIG.AccentColor
+stroke.Thickness = 1.5
+stroke.Transparency = 0.4
+stroke.Parent = MainFrame
+
+-- ============================================================
+-- TITLE BAR
+-- ============================================================
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 44)
+TitleBar.BackgroundColor3 = CONFIG.PanelColor
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = TitleBar
+
+-- cover bottom corners for title bar
+local titleCover = Instance.new("Frame")
+titleCover.Size = UDim2.new(1, 0, 0, 12)
+titleCover.Position = UDim2.new(0, 0, 1, -12)
+titleCover.BackgroundColor3 = CONFIG.PanelColor
+titleCover.BorderSizePixel = 0
+titleCover.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -90, 1, 0)
+TitleLabel.Position = UDim2.new(0, 12, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = CONFIG.Title
+TitleLabel.TextColor3 = CONFIG.TextColor
+TitleLabel.TextSize = isMobile and 15 or 16
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+-- Close button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 34, 0, 34)
+CloseBtn.Position = UDim2.new(1, -40, 0, 5)
+CloseBtn.BackgroundColor3 = CONFIG.CloseColor
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.TextSize = 18
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.AutoButtonColor = true
+CloseBtn.Parent = TitleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = CloseBtn
+
+-- ============================================================
+-- BUTTONS ROW (Scan / Copy)
+-- ============================================================
+local ButtonRow = Instance.new("Frame")
+ButtonRow.Size = UDim2.new(1, -20, 0, 40)
+ButtonRow.Position = UDim2.new(0, 10, 0, 54)
+ButtonRow.BackgroundTransparency = 1
+ButtonRow.Parent = MainFrame
+
+local function makeButton(name, text, color, parent)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = isMobile and 14 or 15
+    btn.Font = Enum.Font.GothamBold
+    btn.AutoButtonColor = true
+    btn.Parent = parent
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 8)
+    c.Parent = btn
+    return btn
+end
+
+local ScanBtn = makeButton("ScanBtn", "🔍 Scan", CONFIG.ScanColor, ButtonRow)
+ScanBtn.Size = UDim2.new(0.58, -5, 1, 0)
+ScanBtn.Position = UDim2.new(0, 0, 0, 0)
+
+local CopyBtn = makeButton("CopyBtn", "📋 Copy Log", CONFIG.CopyColor, ButtonRow)
+CopyBtn.Size = UDim2.new(0.42, -5, 1, 0)
+CopyBtn.Position = UDim2.new(0.58, 5, 0, 0)
+
+-- ============================================================
+-- STATUS LABEL
+-- ============================================================
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -20, 0, 22)
+StatusLabel.Position = UDim2.new(0, 10, 0, 100)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Ready. Tap Scan to begin."
+StatusLabel.TextColor3 = CONFIG.MutedText
+StatusLabel.TextSize = isMobile and 12 or 13
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = MainFrame
+
+-- ============================================================
+-- SCROLLING TEXTBOX (the log)
+-- ============================================================
+local LogFrame = Instance.new("Frame")
+LogFrame.Size = UDim2.new(1, -20, 1, -140)
+LogFrame.Position = UDim2.new(0, 10, 0, 128)
+LogFrame.BackgroundColor3 = CONFIG.PanelColor
+LogFrame.BorderSizePixel = 0
+LogFrame.Parent = MainFrame
+
+local logCorner = Instance.new("UICorner")
+logCorner.CornerRadius = UDim.new(0, 8)
+logCorner.Parent = LogFrame
+
+local LogBox = Instance.new("TextBox")
+LogBox.Size = UDim2.new(1, -12, 1, -12)
+LogBox.Position = UDim2.new(0, 6, 0, 6)
+LogBox.BackgroundTransparency = 1
+LogBox.Text = ""
+LogBox.TextColor3 = CONFIG.TextColor
+LogBox.TextSize = isMobile and 12 or 13
+LogBox.Font = Enum.Font.Code
+LogBox.TextXAlignment = Enum.TextXAlignment.Left
+LogBox.TextYAlignment = Enum.TextYAlignment.Top
+LogBox.TextWrapped = true
+LogBox.ClearTextOnFocus = false
+LogBox.MultiLine = true
+LogBox.TextEditable = false
+LogBox.PlaceholderText = "Scan results will appear here..."
+LogBox.PlaceholderColor3 = CONFIG.MutedText
+LogBox.Parent = LogFrame
+
+-- ScrollingFrame to hold the TextBox (so it scrolls)
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -12, 1, -12)
+Scroll.Position = UDim2.new(0, 6, 0, 6)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 6
+Scroll.ScrollBarImageColor3 = CONFIG.AccentColor
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.Parent = LogFrame
+
+LogBox.Parent = Scroll
+LogBox.Size = UDim2.new(1, -8, 0, 0)
+LogBox.AutomaticSize = Enum.AutomaticSize.Y
+LogBox.Position = UDim2.new(0, 0, 0, 0)
+
+-- ============================================================
+-- SCAN LOGIC
+-- ============================================================
+local scanLogLines = {}  -- holds strings
+
+local function logLine(str)
+    table.insert(scanLogLines, str)
+end
+
+local function rebuildLogText()
+    LogBox.Text = table.concat(scanLogLines, "\n")
+end
+
+local function getFullPath(obj)
+    -- Returns a path usable with game:GetService() or workspace lookups
+    local parts = {}
+    local current = obj
+    while current and current ~= game do
+        table.insert(parts, 1, current.Name)
+        current = current.Parent
+    end
+    -- Determine root service
+    local rootName = parts[1]
+    local rest = {}
+    for i = 2, #parts do
+        rest[#rest+1] = parts[i]
+    end
+    return "game:GetService(\"" .. rootName .. "\")." .. table.concat(rest, ".")
+end
+
+local function scanGame()
+    scanLogLines = {}
+    logLine("=== SCAN RESULTS ===")
+    logLine("Time: " .. os.date("%Y-%m-%d %H:%M:%S"))
+    logLine("")
+
+    local clickDetectors = {}
+    local touchInterests = {}
+
+    -- We scan all descendants of game (workspace, ReplicatedStorage accessible etc.)
+    -- Use pcall in case we hit restricted instances.
+    local ok, err = pcall(function()
+        for _, obj in ipairs(game:GetDescendants()) do
+            if obj:IsA("ClickDetector") then
+                table.insert(clickDetectors, obj)
+            elseif obj:IsA("TouchInterest") then
+                table.insert(touchInterests, obj)
+            end
+        end
+    end)
+
+    if not ok then
+        logLine("[!] Partial scan (restricted areas skipped): " .. tostring(err))
+    end
+
+    logLine(string.format("Found %d ClickDetector(s)", #clickDetectors))
+    logLine("---------------------------------")
+    if #clickDetectors == 0 then
+        logLine("  (none)")
+    else
+        for i, cd in ipairs(clickDetectors) do
+            local path = getFullPath(cd)
+            logLine(string.format("[%d] TYPE: ClickDetector", i))
+            logLine("    PATH: " .. path)
+            -- Include the parent that actually holds the detector
+            if cd.Parent then
+                logLine("    PARENT: " .. getFullPath(cd.Parent))
+            end
+            logLine("")
+        end
+    end
+
+    logLine(string.format("Found %d TouchInterest(s)", #touchInterests))
+    logLine("---------------------------------")
+    if #touchInterests == 0 then
+        logLine("  (none)")
+    else
+        for i, ti in ipairs(touchInterests) do
+            local path = getFullPath(ti)
+            logLine(string.format("[%d] TYPE: TouchInterest", i))
+            logLine("    PATH: " .. path)
+            if ti.Parent then
+                logLine("    PARENT: " .. getFullPath(ti.Parent))
+            end
+            logLine("")
+        end
+    end
+
+    logLine("=== END OF SCAN ===")
+
+    rebuildLogText()
+
+    return #clickDetectors, #touchInterests
+end
+
+-- ============================================================
+-- BUTTON HANDLERS
+-- ============================================================
+ScanBtn.MouseButton1Click:Connect(function()
+    StatusLabel.Text = "Scanning..."
+    StatusLabel.TextColor3 = CONFIG.AccentColor
+    -- small delay so UI updates before heavy scan
+    task.wait(0.05)
+    local cd, ti = scanGame()
+    StatusLabel.Text = string.format("Done. %d ClickDetector(s), %d TouchInterest(s).", cd, ti)
+    StatusLabel.TextColor3 = CONFIG.CopyColor
+end)
+
+local function setClipboard(text)
+    -- Modern clipboard API (setclipboard is only in exploits; this is the
+    -- legit UserInputService method for plugins/Studio - in-game it's stubbed
+    -- to prevent abuse. We still call it; on mobile it silently fails.)
+    local success, err = pcall(function()
+        if setclipboard then
+            setclipboard(text)
+        end
+    end)
+    -- Roblox does not expose a public client clipboard API for regular games.
+    -- As a fallback we select the text so the user can copy manually.
+    LogBox:CaptureFocus()
+    LogBox.CursorPosition = -1
+    LogBox.SelectionStart = 1
+    LogBox.SelectionStart = #LogBox.Text + 1
+    return success
+end
+
+CopyBtn.MouseButton1Click:Connect(function()
+    if #scanLogLines == 0 then
+        StatusLabel.Text = "Nothing to copy - run a scan first."
+        StatusLabel.TextColor3 = CONFIG.CloseColor
+        return
+    end
+
+    local text = table.concat(scanLogLines, "\n")
+
+    local copied = false
+    -- Try exploit/Studio clipboard if available
+    if typeof(setclipboard) == "function" then
+        local ok = pcall(function() setclipboard(text) end)
+        copied = ok
+    end
+
+    -- Fallback: highlight text inside the log for manual copy
+    LogBox:CaptureFocus()
+    task.wait(0.05)
+    LogBox.CursorPosition = 1
+    LogBox.SelectionStart = 1
+
+    if copied then
+        StatusLabel.Text = "Log copied to clipboard!"
+        StatusLabel.TextColor3 = CONFIG.CopyColor
+    else
+        StatusLabel.Text = "Clipboard unavailable - text selected (long-press to copy)."
+        StatusLabel.TextColor3 = CONFIG.AccentColor
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- ============================================================
+-- (Optional) Auto-run a scan on load
+-- ============================================================
+task.spawn(function()
+    task.wait(0.5)
+    scanGame()
+    StatusLabel.Text = "Auto-scan complete. Tap Scan to refresh."
+    StatusLabel.TextColor3 = CONFIG.CopyColor
+end)
+
+print("[Scanner] Loaded. ClickDetector/TouchInterest scanner GUI ready.")
